@@ -101,27 +101,46 @@ var Key = {
 window.addEventListener('keyup', function(event) { Key.onKeyup(event); }, false);
 window.addEventListener('keydown', function(event) { Key.onKeydown(event); }, false);
 
-function Sprite(images, interval){
-    this.images = images;
+var facings = {
+    LEFT : -1,
+    RIGHT : 1,
+}
+
+function Sprite(left_images, right_images, interval){
+    this.left_images = left_images;
+    this.right_images = right_images;
     this.interval = interval;
+    this.timeUntilAnimate = this.interval;
     this.i = 0;
+    this.animating = true;
+    this.facing = facings.LEFT;
     
-    this.image = this.images[self.i];
+    this.image = this.facing == facings.LEFT ? this.left_images[this.i] : this.right_images[this.i];
     
-    this.intervalID = window.setInterval(this.animate, this.interval)
-    
-    self.animate = function(){
-        this.i += 1;
+    this.animate = function(){
+        this.image = this.facing == facings.LEFT ? this.left_images[this.i] : this.right_images[this.i];
         
-        if (self.i >= self.images.length){
-            this.i = 0;
+        if (! this.animating){
+            return;
         }
         
-        this.image = this.images[self.i];
+        this.i += 1;
+        
+        if (this.i >= (this.facing == facings.LEFT ? this.left_images : this.right_images).length){
+            this.i = 0;
+        }
+    }
+    
+    this.update = function(){        
+        this.timeUntilAnimate -= deltaTime;
+        
+        if (this.timeUntilAnimate <= 0){
+            this.animate();
+            this.timeUntilAnimate = this.interval;
+        }
     }
     
     this.draw = function(ctx, pos){
-        console.log(this.image);
         ctx.drawImage(this.image, pos[0], pos[1]);
     }
     

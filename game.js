@@ -109,13 +109,16 @@ function Platform(pos, size, colour){
 
 function Player(pos, size){
     
-    this.images = [
+    this.right_images = [
         document.getElementById("rick0"),
         document.getElementById("rick1"),
         document.getElementById("rick2"),
     ];
-    
-    console.log(this.images);
+    this.left_images = [
+        document.getElementById("rick3"),
+        document.getElementById("rick4"),
+        document.getElementById("rick5"),
+    ];
     
     Rect.call(this, pos, size, "#FF0000");
     PhysicsObject.call(this, this);
@@ -124,9 +127,10 @@ function Player(pos, size){
     
     this.moveSpeed = 200;
     
-    this.sprite = new Sprite(this.images, 100);
+    this.sprite = new Sprite(this.left_images, this.right_images, .1);
     
     this.update = function(){
+        this.sprite.update();
         this.handleKey();
     };
     
@@ -139,12 +143,17 @@ function Player(pos, size){
     this.handleKey = function(){
         if (Key.isDown(Key.LEFT) || Key.isDown(Key.A)){
             this.velocity[0] = this.moveSpeed * -1;
+            this.sprite.animating = this.isGrounded;
+            this.sprite.facing = facings.LEFT;
         }
         else if(Key.isDown(Key.RIGHT) || Key.isDown(Key.D)){
             this.velocity[0] = this.moveSpeed;
+            this.sprite.animating = this.isGrounded;
+            this.sprite.facing = facings.RIGHT;
         }
         else{
             this.velocity[0] = 0;
+            this.sprite.animating = false;
         }
         
         if (Key.isDown(Key.SPACE)){
