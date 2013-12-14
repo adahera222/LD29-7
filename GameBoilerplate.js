@@ -1,6 +1,6 @@
 var canvas = document.getElementById("canvas");
 var ctx = canvas.getContext("2d");
-ctx.font = "72px Verdana";
+ctx.font = "32px Verdana";
 
 var FPS = 60;
 
@@ -73,7 +73,7 @@ var Key = {
 	_pressed: {},
 	
 	ENTER : 13,
-	ALT : 18,
+	SPACE : 32,
 
 	LEFT  : 37,
 	UP    : 38,
@@ -101,3 +101,31 @@ var Key = {
 window.addEventListener('keyup', function(event) { Key.onKeyup(event); }, false);
 window.addEventListener('keydown', function(event) { Key.onKeydown(event); }, false);
 
+function Sprite(images, interval){
+    this.images = images;
+    this.interval = interval;
+    this.i = 0;
+    
+    this.image = this.images[self.i];
+    
+    this.intervalID = window.setInterval(this.animate, this.interval)
+    
+    self.animate = function(){
+        this.i += 1;
+        
+        if (self.i >= self.images.length){
+            this.i = 0;
+        }
+        
+        this.image = this.images[self.i];
+    }
+    
+    this.draw = function(ctx, pos){
+        console.log(this.image);
+        ctx.drawImage(this.image, pos[0], pos[1]);
+    }
+    
+    this.end = function(){
+        window.endInterval(this.intervalID);
+    }
+}

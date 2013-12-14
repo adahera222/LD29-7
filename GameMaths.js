@@ -57,11 +57,15 @@ function Vector2(x, y){
     this.add = function(other){
 		this[0] += other[0];
 		this[1] += other[1];
+        
+        return this;
 	};
 	
 	this.sub = function(other){
 		this[0] -= other[0];
 		this[1] -= other[1];
+        
+        return this;
 	};
 	
 	this.mul = function(other){
@@ -73,6 +77,8 @@ function Vector2(x, y){
 			this[0] *= other[0];
 			this[1] *= other[1];
 		}
+        
+        return this;
 	};
 	
 	this.div = function(other){
@@ -84,6 +90,8 @@ function Vector2(x, y){
 			this[0] /= other[0];
 			this[1] /= other[1];
 		}
+        
+        return this;
 	};
 	
 	this.equals = function(other){
@@ -102,11 +110,13 @@ function Vector2(x, y){
 		var m = this.magnitude();
 		
 		if (m == 0){
-			return;
+			return this;
 		}
 		
 		this[0] /= m;
 		this[1] /= m;
+        
+        return this;
 	};
 	
 	this.angleTo = function(other){
@@ -135,11 +145,13 @@ function Vector2(x, y){
 		var ratio = magnitude / this.magnitude();
 		
 		this.mul(ratio);
+        return this;
 	};
 	
 	this.lerp = function(other, t){
 		this[0] += other[0] * t;
 		this[1] += other[1] * t;
+        return this;
 	};
 	
 	this.rotate = function(rads){
@@ -150,6 +162,8 @@ function Vector2(x, y){
 		
 		this[0] = x * cos - this[1] * sin;
 		this[1] = x * sin + this[1] * cos;
+        
+        return this;
 	};
 	
 	this.copy = function(){
@@ -159,12 +173,12 @@ function Vector2(x, y){
 
 function Shape(){
 	this.collide = function(other){
-		if (other instanceof Circle)
-			return this.collidecircle(other);
-		else if (other instanceof Rect)
-			return this.colliderect(other);
+		if (other.type == "Circle")
+			return this.collideCircle(other);
+		else if (other.type == "Rect")
+			return this.collideRect(other);
 		else
-			return this.collidepoint(other);
+			return this.collidePoint(other);
 	}
 }
 
@@ -175,6 +189,11 @@ function Rect(pos, size, colour){
 	this.pos =  new Vector2(pos[0], pos[1]);
 	this.size = new Vector2(size[0], size[1]);
 	this.colour = colour;
+    this.type = "Rect";
+    
+    this.__defineGetter__("centre", function(){
+        return new Vector2(this.pos[0] + size[0] / 2, this.pos[0] + size[1] / 2);;
+    });
 	
 	this.collideRect = function(other){
 		if (this.pos[0] > (other.pos[0] + other.size[0]) || (this.pos[0] + this.size[0]) < other.pos[0]) return false;
@@ -194,6 +213,10 @@ function Rect(pos, size, colour){
 	this.copy = function(){
 		return new Rect(this.pos, this.size);
 	};
+    
+    this.translate = function(vector){
+        this.pos.add(vector);
+    }
 	
 	this.draw = function(ctx, width, colour){
 		if (! width){
@@ -215,6 +238,7 @@ function Circle(centre, radius, colour){
 	this.centre = new Vector2(centre[0], centre[1]);
 	this.radius = radius;
 	this.colour = colour;
+    this.type = "Circle";
 	
 	this.collideRect = function(rect){
 		// Find the closest point to the circle within the rectangle
@@ -245,6 +269,10 @@ function Circle(centre, radius, colour){
 	this.copy = function(){
 		return new Circle(this.centre, this.radius);
 	};
+    
+    this.translate = function(vector){
+        this.centre.add(vector);
+    };
 	
 	this.draw = function(ctx, width, colour){
 		ctx.beginPath();
