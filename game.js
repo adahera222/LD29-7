@@ -85,6 +85,7 @@ function PhysicsObject(collider, kinematic){
         
         if (hit[0].length == 0){
             this.physicsMoveX();
+            this.isBlocked = false;
         }
         else{
             this.isBlocked = true;
@@ -107,6 +108,11 @@ function Platform(pos, size, colour){
     PhysicsObject.call(this, this, true);
 }
 
+function CirclePlatform(centre, radius, colour){
+    Circle.call(this, centre, radius, colour ? colour : "#000000");
+    PhysicsObject.call(this, this, true);
+}
+
 function Player(pos, size){
     
     this.right_images = [
@@ -123,7 +129,7 @@ function Player(pos, size){
     Rect.call(this, pos, size, "#FF0000");
     PhysicsObject.call(this, this);
     
-    this.jumpSpeed = 300;
+    this.jumpSpeed = 240;
     
     this.moveSpeed = 200;
     
@@ -166,17 +172,87 @@ function Player(pos, size){
     }
 }
 
+function Enemy(pos, size, colour){
+    Rect.call(this, pos, size, colour ? colour : "#000000");
+    PhysicsObject.call(this, this);
+    
+    this.update = function(player){
+        
+    }
+}
+
+function Bat(pos){
+    var size = [20, 15];
+    Enemy.call(this, pos, size);
+    
+    this.timeBetweenDirCalc = .3;
+    this.timeUntilDirCalc   =  0;
+    
+    this.left_images = [
+        document.getElementById("bat0"),
+        document.getElementById("bat1"),
+    ]
+    this.right_images = [
+        document.getElementById("bat2"),
+        document.getElementById("bat3"),
+    ]
+    
+    this.sprite = new Sprite(this.left_images, this.right_images, 0.1);
+    this.speed = 200;
+    
+    this.update = function(player){
+        this.sprite.update();
+        
+        this.timeUntilDirCalc -= deltaTime;
+        
+        if (this.timeUntilDirCalc <= 0){
+            this.velocity = this.calcDirection(player).mul(this.speed);
+            this.timeUntilDirCalc = this.timeBetweenDirCalc;
+        }
+    }
+    
+    this.calcDirection = function(player){
+        var dir = this.pos.angleTo(player.collider.pos).mul(this.speed);
+        dir[0] *= -1;
+        dir.rotate(random.binomial() * Math.PI * (3/4)).normalise();
+        
+        if (dir[1] < 0){
+            this.sprite.facing = facings.LEFT;
+        }
+        else{
+            this.sprite.facing = facings.RIGHT;
+        }
+        
+        return dir;
+    }
+    
+    this.draw = function(){
+        this.sprite.draw(ctx, this.pos);
+    }
+}
+
 var playerSize = [20, 50];
 
 var Game = {
     player : new Player([(canvas.width - playerSize[0]) / 2, (canvas.height - playerSize[1]) / 2], playerSize),
     
-    platforms : [new Platform([0, 500], [800, 600])],
+    platforms : [new Platform([0, 500], [800, 600]),
+                 new Platform([1000, 500], [80, 60]),
+                 new Platform([1200, 400], [200, 30]),
+                 new Platform([1600, 650], [400, 20]),
+                 new Platform([2200, 750], [50, 50]),],
+                 
+    enemies : [new Bat([0, 0])],
 
     update : function(){
         updateDeltaTime();
         
         this.player.update();
+        
+        for (i in this.enemies){
+            this.enemies[i].update(this.player);
+        }
+        
         PhysicsManager.update();
         
         var scroll = this.player.velocity.copy().mul(-deltaTime);
@@ -192,6 +268,10 @@ var Game = {
         
         for (i in this.platforms){
             this.platforms[i].draw(ctx);
+        }
+        
+        for (i in this.enemies){
+            this.enemies[i].draw(ctx);
         }
         
         ctx.fillText(Math.floor(1 / deltaTime), 0, 32)

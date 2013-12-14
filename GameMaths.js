@@ -289,3 +289,9 @@ function Circle(centre, radius, colour){
 		}
 	};
 }
+
+var random = {
+    binomial : function(){
+        return Math.random() - Math.random();
+    }
+}
