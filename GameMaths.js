@@ -240,6 +240,10 @@ function Circle(centre, radius, colour){
 	this.colour = colour;
     this.type = "Circle";
 	
+    this.__defineGetter__("pos", function(){
+        return this.centre;
+    });
+    
 	this.collideRect = function(rect){
 		// Find the closest point to the circle within the rectangle
         var closestX = clamp(this.centre[0], rect.pos[0], rect.pos[0] + rect.size[0]);
@@ -293,5 +297,16 @@ function Circle(centre, radius, colour){
 var random = {
     binomial : function(){
         return Math.random() - Math.random();
-    }
+    },
+    
+    gaussian : function() {
+        var x1, x2, rad, y1;
+        do {
+            x1 = 2 * Math.random() - 1;
+            x2 = 2 * Math.random() - 1;
+            rad = x1 * x1 + x2 * x2;
+        } while(rad >= 1 || rad == 0);
+        var c = Math.sqrt(-2 * Math.log(rad) / rad);
+        return x1 * c;
+    },
 }

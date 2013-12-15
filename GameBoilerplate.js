@@ -1,6 +1,6 @@
 var canvas = document.getElementById("canvas");
 var ctx = canvas.getContext("2d");
-ctx.font = "32px Snoot";
+ctx.font = "20px Snoot";
 
 var SCREENRECT = new Rect([0, 0], [canvas.width, canvas.height]);
 
@@ -91,7 +91,7 @@ var Key = {
 		return this._pressed[keyCode];
 	},
 
-	onKeydown: function(event) {
+    onKeydown: function(event) {
 		this._pressed[event.keyCode] = true;
 	},
 
