@@ -192,7 +192,7 @@ function Rect(pos, size, colour){
     this.type = "Rect";
     
     this.__defineGetter__("centre", function(){
-        return new Vector2(this.pos[0] + size[0] / 2, this.pos[0] + size[1] / 2);;
+        return new Vector2(this.pos[0] + (this.size[0] / 2), this.pos[1] + (this.size[1] / 2));
     });
 	
 	this.collideRect = function(other){

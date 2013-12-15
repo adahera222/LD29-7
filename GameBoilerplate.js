@@ -1,6 +1,8 @@
 var canvas = document.getElementById("canvas");
 var ctx = canvas.getContext("2d");
-ctx.font = "32px Verdana";
+ctx.font = "32px Snoot";
+
+var SCREENRECT = new Rect([0, 0], [canvas.width, canvas.height]);
 
 var FPS = 60;
 
@@ -117,10 +119,10 @@ function Sprite(left_images, right_images, interval){
     
     this.image = this.facing == facings.LEFT ? this.left_images[this.i] : this.right_images[this.i];
     
-    this.animate = function(){
+    this.animate = function(override){
         this.image = this.facing == facings.LEFT ? this.left_images[this.i] : this.right_images[this.i];
         
-        if (! this.animating){
+        if (! this.animating && ! override){
             return;
         }
         

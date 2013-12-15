@@ -46,7 +46,6 @@ function PhysicsObject(collider, kinematic){
     this.collider = collider;
     
     this.kinematic  = kinematic;
-    this.isBlocked = false;
     this.isGrounded = false;
     
     PhysicsManager.addObject(this);
@@ -85,10 +84,8 @@ function PhysicsObject(collider, kinematic){
         
         if (hit[0].length == 0){
             this.physicsMoveX();
-            this.isBlocked = false;
         }
         else{
-            this.isBlocked = true;
             this.velocity[0] = 0;
         }
         
@@ -97,11 +94,18 @@ function PhysicsObject(collider, kinematic){
             this.isGrounded = false;
         }
         else{
-            this.isGrounded = true;
             this.velocity[1] = 0;
+            
+            for (var i=0; i < hit[1].length; i++){
+                if (hit[1][i].collider.pos[1] > this.collider.pos[1]){
+                    this.isGrounded = true;
+                }
+            }
         }
     }
 }
+
+//Look at all those close-brackets. Yes, the only comment is this useless.
 
 function Platform(pos, size, colour){
     Rect.call(this, pos, size, colour ? colour : "#000000");
@@ -111,6 +115,63 @@ function Platform(pos, size, colour){
 function CirclePlatform(centre, radius, colour){
     Circle.call(this, centre, radius, colour ? colour : "#000000");
     PhysicsObject.call(this, this, true);
+}
+
+function Particle(pos, radius, colour){
+    Circle.call(this, pos, radius, colour);
+    Game.particles.push(this);
+    
+    this.mask = null;
+    this.dead = false;
+    
+    this.update = function(){
+    }
+    
+    this.onCollision = function(hit){
+        
+    }
+    
+    this.checkDestroy = function(){
+        if (this.dead){
+            return;
+        }
+        
+        var hit = PhysicsManager.isColliding(this);
+        
+        if (hit.length > 0 && ! (hit.length == 1 && hit[0] == this.mask)){
+            this.onCollision(hit);
+            this.die();
+        }
+        
+        if (! this.collideRect(SCREENRECT)){
+            this.die();
+        }
+    }
+    
+    this.die = function(){
+        this.dead = true;
+    }
+}
+
+function Bullet(pos, dir, owner){
+    var radius = 1.2;
+    var colour = "#333333";
+    
+    Particle.call(this, pos, radius, colour);
+    
+    this.speed = 400;
+    this.dir = dir;
+    this.mask = owner;
+    
+    this.update = function(){
+        if (this.dead){
+            return;
+        }
+        
+        this.translate(this.dir.copy().mul(this.speed * deltaTime));
+    }
+    
+    this.onCollision(hit)
 }
 
 function Player(pos, size){
@@ -134,6 +195,8 @@ function Player(pos, size){
     this.moveSpeed = 200;
     
     this.sprite = new Sprite(this.left_images, this.right_images, .1);
+    this.right_arm = document.getElementById("right_arm");
+    this.left_arm = document.getElementById("left_arm");
     
     this.update = function(){
         this.sprite.update();
@@ -143,7 +206,17 @@ function Player(pos, size){
     this.jump = function(){
         if (! this.isGrounded) return;
         
+        while (this.sprite.i != 1){
+            this.sprite.animate(true);
+        }
         this.velocity[1] = -this.jumpSpeed;
+    }
+    
+    this.fire = function(){
+        var angle = this.collider.centre.angleTo(mousePos);
+        angle[0] = Math.abs(angle[0]) * this.sprite.facing;
+        
+        return new Bullet(this.collider.centre, angle, this);
     }
     
     this.handleKey = function(){
@@ -168,6 +241,31 @@ function Player(pos, size){
     }
     
     this.draw = function(){
+        var arm;
+        if (this.sprite.facing == facings.LEFT){
+            arm = this.left_arm;
+        }
+        else{
+            arm = this.right_arm;
+        }
+                
+        var angle = this.collider.centre.angleTo(mousePos);
+        
+        
+        var armPos = new Vector2(this.collider.centre[0], this.collider.centre[1]);
+        var armOffset = new Vector2(arm.width / 2, arm.height / 2)
+        
+        var rotation = toRadians(angle)
+        rotation = Math.abs(rotation) * this.sprite.facing * -1;
+        
+        armOffset.rotate(rotation);
+        armPos.add(armOffset);
+        
+        rotation = toRadians(angle.mul(-1));
+        rotation = Math.abs(rotation) * this.sprite.facing;
+        
+        drawRotatedImage(arm, armPos, rotation);
+        
         this.sprite.draw(ctx, this.pos);
     }
 }
@@ -231,6 +329,12 @@ function Bat(pos){
     }
 }
 
+function onMouseDown(){
+    Game.player.fire();
+}
+
+window.onmousedown = onMouseDown;
+
 var playerSize = [20, 50];
 
 var Game = {
@@ -240,12 +344,40 @@ var Game = {
                  new Platform([1000, 500], [80, 60]),
                  new Platform([1200, 400], [200, 30]),
                  new Platform([1600, 650], [400, 20]),
-                 new Platform([2200, 750], [50, 50]),],
+                 new Platform([2200, 750], [50, 50]),
                  
-    enemies : [new Bat([0, 0])],
+                 new Platform([-500, 370], [400, 50]),
+                 new Platform([-700, 300], [140, 20]),
+                 new Platform([-1600, 400], [600, 30]),
+                 new Platform([-1800, 370], [200, 50]),
+                 new Platform([-2300, 400], [200, 30]),
+                 new Platform([-2100, 700], [700, 40]),
+                 new Platform([-2500, 550], [300, 700]),],
+                 
+    enemies : [new Bat([0, 0]), new Bat([100, 100]), new Bat([100, 200]), new Bat([200, 100]),
+               new Bat([300, 200]), new Bat([200, 300]), new Bat([300, 300]), new Bat([200, 200]),],
+               
+    particles : [],
+    
+    dt_threshold : .2,
+    
+    deads : true,
 
-    update : function(){
+    update : function(){        
         updateDeltaTime();
+        
+        if (this.deads){
+            for (var i=0; i < 100; i++){
+                var b = new Bullet([0, 0], [0, 0]);
+                b.die();
+            }
+        }
+        
+        if (deltaTime > this.dt_threshold){
+            return;
+        }
+        
+        var playerPos = this.player.collider.pos.copy();
         
         this.player.update();
         
@@ -253,12 +385,16 @@ var Game = {
             this.enemies[i].update(this.player);
         }
         
+        for (i in this.particles){
+            this.particles[i].update();
+            this.particles[i].checkDestroy();
+        }
+        
         PhysicsManager.update();
         
-        var scroll = this.player.velocity.copy().mul(-deltaTime);
-        scroll[0] *= ! this.player.isBlocked;
-        scroll[1] *= ! this.player.isGrounded;
-        PhysicsManager.scroll(scroll);
+        var delta = this.player.collider.pos.copy().sub(playerPos);
+        
+        PhysicsManager.scroll(delta.mul(-1));
     },
 
     render : function(){
@@ -272,6 +408,14 @@ var Game = {
         
         for (i in this.enemies){
             this.enemies[i].draw(ctx);
+        }
+        
+        for (i in this.particles){
+            if (this.particles[i].dead){
+                continue;
+            }
+            
+            this.particles[i].draw(ctx);
         }
         
         ctx.fillText(Math.floor(1 / deltaTime), 0, 32)
