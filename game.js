@@ -914,7 +914,7 @@ var Game = {
                  new Platform([-2500, 550], [250, 700]),
                 ],
                  
-    enemies : [new Monster([-2850, 275]), new Turret([300, 300])],
+    enemies : [new Monster([-2850, 275])],
                
     particles : [],
     
