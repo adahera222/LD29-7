@@ -179,7 +179,7 @@ function Particle(pos, radius, colour){
     }
 }
 
-function Bullet(pos, dir, owner, colour, radius){
+function Bullet(pos, dir, owner, colour, radius, damage){
     
     var radius = radius ? radius : 1.2;
     var colour = colour ? colour : "#333333";
@@ -191,7 +191,7 @@ function Bullet(pos, dir, owner, colour, radius){
     this.owner = owner;
     this.mask = this.owner;
     
-    this.maxDamageAmount = 40;
+    this.maxDamageAmount = damage ? damage : 40;
     
     this.update = function(){
         if (this.dead){
@@ -453,7 +453,7 @@ function Player(pos, size){
                 
         var angle = this.collider.centre.angleTo(mousePos);
         
-        var armPos = new Vector2(this.collider.centre[0], this.collider.centre[1]);
+        var armPos = this.centre;
         var armOffset = new Vector2(arm.width / 2, arm.height / 2)
         
         var rotation = toRadians(angle)
@@ -629,6 +629,14 @@ function Runner(pos){
     
     this.currentPlatform = null;
     
+    this.onCollisionX = function(hit){
+        for (i in hit){
+            if (hit[i] instanceof Turret){
+                this.jump();
+            }
+        }
+    }
+    
     this.onCollisionY = function(hit){
         for (i in hit){
             if (hit[i].collider.centre[1] < this.centre[1]){
@@ -699,6 +707,95 @@ function Runner(pos){
         }
         
         this.sprite.draw(ctx, this.pos);
+    }
+}
+
+Turret.size = [40, 26];
+function Turret(pos){
+    Enemy.call(this, pos, Turret.size, "#0000DD", 150);
+    
+    this.image = document.getElementById("turret");
+    this.cannon = document.getElementById("turret_cannon")
+    
+    this.shootSounds = [
+        document.getElementById("shoot0"),
+        document.getElementById("shoot1"),
+    ];
+    
+    this.cannonCentreOffset = new Vector2(4, 5);
+    
+    this.fireCooldown = 1;
+    this.timeUntilFire = 0;
+    
+    this.fire = function(){
+        if (this.timeUntilFire > 0){
+            return;
+        }
+        this.timeUntilFire = this.fireCooldown;
+        
+        firePos = this.centre.copy();
+        
+        if (! SCREENRECT.collidePoint(firePos)){
+            return;
+        }
+        
+        angle = firePos.angleTo(Game.player.centre);
+        angle[0] *= -1;
+        
+        angle.rotate((Math.PI / 6) * random.binomial());
+        
+        this.shootSounds[Math.floor(Math.random() * this.shootSounds.length)].play();
+        
+        return new Bullet(firePos, angle, this, "#222222", 2, 10);
+    }
+    
+    this.onCollisionY = function(hit){
+        for (i in hit){
+            if (hit[i].collider.centre[1] < this.centre[1]){
+                continue;
+            }
+            
+            if ("damage" in hit[i]){
+                hit[i].die();
+            }
+        }
+    }
+    
+    this.update = function(player){
+        if (this.dead){
+            return;
+        }
+        
+        this.fire()
+        this.timeUntilFire -= deltaTime;
+    }
+    
+    this.draw = function(){
+        if (this.dead){
+            return;
+        }
+        
+        var angle = this.centre.angleTo(Game.player.centre);
+        
+        var cannonPos = this.centre;
+        var cannonOffset = new Vector2(this.cannon.width / 2, this.cannon.height / 2)
+        
+        var rotation = toRadians(angle)
+        rotation = Math.abs(rotation) /* * this.sprite.facing*/ * -1 * -1;
+        
+        rotation = Math.abs(rotation) * ((angle[0] < 0) ? -1 : 1)
+        
+        cannonOffset.rotate(rotation);
+        cannonPos.add(cannonOffset);
+        
+        rotation = toRadians(angle.mul(-1));
+        /* * this.sprite.facing*/;
+        
+        cannonPos.add(this.cannonCentreOffset);
+        
+        drawRotatedImage(this.cannon, cannonPos, rotation);
+        
+        ctx.drawImage(this.image, this.pos[0], this.pos[1]);
     }
 }
 
@@ -817,7 +914,7 @@ var Game = {
                  new Platform([-2500, 550], [250, 700]),
                 ],
                  
-    enemies : [new Monster([-2850, 275])],
+    enemies : [new Monster([-2850, 275]), new Turret([300, 300])],
                
     particles : [],
     
@@ -827,7 +924,7 @@ var Game = {
     
     spawnEnemyChance : 1/3, //Per second.
     
-    enemyTypes : [Runner, Bat],
+    enemyTypes : [Runner, Bat, Turret],
     
     timeBetweenSpawnEnemy : 1,
     timeUntilSpawnEnemy   : 0,
