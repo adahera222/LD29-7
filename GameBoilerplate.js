@@ -108,7 +108,7 @@ var facings = {
     RIGHT : 1,
 }
 
-function Sprite(left_images, right_images, interval){
+function Sprite(left_images, right_images, interval, switcher){
     this.left_images = left_images;
     this.right_images = right_images;
     this.interval = interval;
@@ -116,6 +116,9 @@ function Sprite(left_images, right_images, interval){
     this.i = 0;
     this.animating = true;
     this.facing = facings.LEFT;
+    
+    this.switcher = switcher;
+    this.direction = 1;
     
     this.image = this.facing == facings.LEFT ? this.left_images[this.i] : this.right_images[this.i];
     
@@ -126,10 +129,16 @@ function Sprite(left_images, right_images, interval){
             return;
         }
         
-        this.i += 1;
+        this.i += 1 * this.direction;
         
-        if (this.i >= (this.facing == facings.LEFT ? this.left_images : this.right_images).length){
-            this.i = 0;
+        if (this.i >= (this.facing == facings.LEFT ? this.left_images : this.right_images).length || (this.i == 0 && this.direction == -1)){
+            if (! this.switcher){
+                this.i = 0;
+            }
+            else{
+                this.direction *= -1;
+                this.i += 1 * this.direction;
+            }
         }
     }
     

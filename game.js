@@ -1,3 +1,9 @@
+deathSounds = [
+    document.getElementById("death0"),
+    document.getElementById("death1"),
+    document.getElementById("death2"),
+];
+
 var PhysicsManager = {
     g : new Vector2(0, 9.81),
     pixelsPerMetre : 25,
@@ -128,12 +134,12 @@ function PhysicsObject(collider, kinematic){
 
 
 function Platform(pos, size, colour){
-    Rect.call(this, pos, size, colour ? colour : "#000000");
+    Rect.call(this, pos, size, colour ? colour : "#888888");
     PhysicsObject.call(this, this, true);
 }
 
 function CirclePlatform(centre, radius, colour){
-    Circle.call(this, centre, radius, colour ? colour : "#000000");
+    Circle.call(this, centre, radius, colour ? colour : "#888888");
     PhysicsObject.call(this, this, true);
 }
 
@@ -173,15 +179,17 @@ function Particle(pos, radius, colour){
     }
 }
 
-function Bullet(pos, dir, owner){
-    var radius = 1.2;
-    var colour = "#333333";
+function Bullet(pos, dir, owner, colour, radius){
+    
+    var radius = radius ? radius : 1.2;
+    var colour = colour ? colour : "#333333";
     
     Particle.call(this, pos, radius, colour);
     
     this.speed = 400;
     this.dir = dir;
-    this.mask = owner;
+    this.owner = owner;
+    this.mask = this.owner;
     
     this.maxDamageAmount = 40;
     
@@ -196,7 +204,13 @@ function Bullet(pos, dir, owner){
     this.onCollision = function(hit){
         for (i in hit){
             if ("damage" in hit[i] && hit[i] != this.mask){
-                hit[i].damage(this.maxDamageAmount * (Math.random() / 2 + .5), this.centre.copy());
+                var amount = this.maxDamageAmount * (Math.random() / 2 + .5);
+                
+                hit[i].damage(amount, this.centre.copy());
+                
+                if ("score" in this.owner){
+                    this.owner.score += Math.floor(amount);
+                }
             }
         }
     }
@@ -220,11 +234,12 @@ function Blood(pos){
     }
 }
 
-function FloatingText(pos, text, speed, colour){
-    this.pos      = pos;
-    this.text     = text;
-    this.speed    = speed;
-    this.colour   = colour;
+function FloatingText(pos, text, speed, colour, font){
+    this.pos    = pos;
+    this.text   = text;
+    this.speed  = speed;
+    this.colour = colour;
+    this.font   = font ? font : "20px Snoot";
     
     this.dead = false;
     
@@ -237,6 +252,7 @@ function FloatingText(pos, text, speed, colour){
             return;
         }
         
+        ctx.font = this.font;
         ctx.fillStyle = this.colour;
         ctx.fillText(this.text, this.pos[0], this.pos[1]);
     }
@@ -264,7 +280,7 @@ function HealthObject(maxHealth){
     
     this.dead = false;
     
-    this.heathAsRatio = function(){
+    this.healthAsRatio = function(){
         return this.health / this.maxHealth;
     }
     
@@ -276,6 +292,10 @@ function HealthObject(maxHealth){
         }
         if (floatingTextPos){
             new FloatingText(floatingTextPos, Math.floor(amount), 150, this == Game.player ? "#FF0000" : "#55BB00");
+        }
+        
+        if ("hurtSounds" in this && this.health > 0){
+            this.hurtSounds[Math.floor(Math.random() * this.hurtSounds.length)].play();
         }
     }
     
@@ -297,6 +317,23 @@ function Player(pos, size){
         document.getElementById("rick5"),
     ];
     
+    this.hurtSounds = [
+        document.getElementById("hurt0"),
+        document.getElementById("hurt1"),
+        document.getElementById("hurt2"),
+        document.getElementById("hurt3"),
+        document.getElementById("hurt4"),
+    ];
+    
+    this.jumpSounds = [
+        document.getElementById("jump"),
+    ];
+    
+    this.shootSounds = [
+        document.getElementById("shoot0"),
+        document.getElementById("shoot1"),
+    ];
+    
     Rect.call(this, pos, size, "#FF0000");
     PhysicsObject.call(this, this);
     HealthObject.call(this, 100);
@@ -305,6 +342,8 @@ function Player(pos, size){
     
     this.moveSpeed = 200;
     
+    this.score = 0;
+    
     this.sprite = new Sprite(this.left_images, this.right_images, .1);
     this.right_arm = document.getElementById("right_arm");
     this.left_arm = document.getElementById("left_arm");
@@ -312,13 +351,31 @@ function Player(pos, size){
     this.bulletCooldown = .2;
     this.timeUntilBullet = 0;
     
+    healthRectSize = [200, 20];
+    
+    this.redHealthRect = new Rect([(canvas.width - healthRectSize[0]) / 2, (canvas.height - healthRectSize[1]) / 8], healthRectSize, "#FF0000")
+    this.greenHealthRect = this.redHealthRect.copy();
+    this.greenHealthRect.colour = "#00FF00";
+    
+    this.onCollisionX = function(hit){
+        for (i in hit){
+            if (hit[i] instanceof Monster){
+                this.die();
+            }
+        }
+    }
+    
     this.update = function(){
         if (this.dead){
             return;
         }
         
+        this.checkDeathDepth();
+        
         this.sprite.update();
         this.handleKey();
+        
+        this.greenHealthRect.size[0] = this.redHealthRect.size[0] * this.healthAsRatio();
         
         this.timeUntilBullet -= deltaTime;
     };
@@ -330,6 +387,8 @@ function Player(pos, size){
             this.sprite.animate(true);
         }
         this.velocity[1] = -this.jumpSpeed;
+        
+        this.jumpSounds[Math.floor(Math.random() * this.jumpSounds.length)].play();
     }
     
     this.fire = function(){
@@ -345,6 +404,8 @@ function Player(pos, size){
         angle[0] = Math.abs(angle[0]) * this.sprite.facing;
         
         this.timeUntilBullet = this.bulletCooldown;
+        
+        this.shootSounds[Math.floor(Math.random() * this.shootSounds.length)].play();
         
         return new Bullet(this.collider.centre, angle, this);
     }
@@ -370,7 +431,14 @@ function Player(pos, size){
         }
     }
     
+    this.checkDeathDepth = function(){
+        if (Game.screenToWorld(this.pos)[1] > Game.deathDepth){
+            this.die();
+        }
+    }
+    
     this.draw = function(){
+        
         if (this.dead){
             return;
         }
@@ -400,11 +468,28 @@ function Player(pos, size){
         drawRotatedImage(arm, armPos, rotation);
         
         this.sprite.draw(ctx, this.pos);
+        
+        ctx.fillStyle = "#FFFFFF";
+        ctx.font = "72px Snoot"
+        ctx.fillText(this.score, 0, 48);
+        
+        this.redHealthRect.draw(ctx);
+        this.greenHealthRect.draw(ctx);
+        this.redHealthRect.draw(ctx, 1, "#000000");
     }
     
     this.die = function(){
         this.dead = true;
         this.physicsEnabled = false;
+        
+        bloodParticlesPerArea = 50;
+        
+        for (var i=0; i < (this.size[0] * this.size[1]) / bloodParticlesPerArea; i++){
+            new Blood([this.pos[0] + this.size[0] * Math.random(), this.pos[1] + this.size[1] * Math.random()]);
+        }
+        
+        deathSounds[Math.floor(Math.random() * deathSounds.length)].play();
+        window.setTimeout(Game.gameOver, 3000);
     }
 }
 
@@ -419,14 +504,24 @@ function Enemy(pos, size, colour, health){
         
     }
     
+    this.checkDeathDepth = function(){
+        if (Game.screenToWorld(this.pos)[1] > Game.deathDepth){
+            this.die();
+        }
+    }
+    
     this.die = function(){
         this.dead = true;
         
-        for (var i=0; i < (this.size[0] * this.size[1]) / this.bloodParticlesPerArea; i++){
+        for (var i=0; i < clamp((this.size[0] * this.size[1]) / this.bloodParticlesPerArea, 1, 200); i++){
             new Blood([this.pos[0] + this.size[0] * Math.random(), this.pos[1] + this.size[1] * Math.random()]);
         }
         
         this.physicsEnabled = false;
+        
+        if (SCREENRECT.collideRect(this)){
+            deathSounds[Math.floor(Math.random() * deathSounds.length)].play();
+        }
     }
 }
 
@@ -449,10 +544,30 @@ function Bat(pos){
     this.sprite = new Sprite(this.left_images, this.right_images, 0.08);
     this.speed = 200;
     
+    this.damageCooldown = .2;
+    this.timeUntilDamage = 0;
+    
+    this.onCollisionX = function(hit){
+        if (this.timeUntilDamage > 0){
+            return;
+        }
+        
+        for (i in hit){
+            if ("damage" in hit[i]){
+                hit[i].damage(1, this.centre);
+                this.timeUntilDamage = this.damageCooldown;
+            }
+        }
+    }
+    
     this.update = function(player){
         if (this.dead){
             return;
         }
+        
+        this.timeUntilDamage -= deltaTime;
+        
+        this.checkDeathDepth();
         
         this.sprite.update();
         
@@ -489,9 +604,8 @@ function Bat(pos){
 }
 
 Runner.size = [20, 50];
-
 function Runner(pos){
-    Enemy.call(this, pos, Runner.size, "#0000DD", 80);
+    Enemy.call(this, pos, Runner.size, "#0000DD", 100);
     
     this.timeBetweenDirCalc = .01;
     this.timeUntilDirCalc   =  0;
@@ -525,7 +639,7 @@ function Runner(pos){
                 this.platform = hit[i];
             }
             
-            if (hit[i] == Game.player){
+            if ("damage" in hit[i]){
                 hit[i].damage(this.jumpDamage * (.5 + Math.random() / 2), hit[i].pos.copy());
             }
         }
@@ -535,6 +649,8 @@ function Runner(pos){
         if (this.dead){
             return;
         }
+        
+        this.checkDeathDepth();
         
         this.sprite.update();
         
@@ -586,6 +702,83 @@ function Runner(pos){
     }
 }
 
+Monster.size = [250, 550];
+function Monster(pos){
+    Enemy.call(this, pos, Monster.size, "#0000DD", 1000);
+    this.kinematic = true;
+    
+    this.right_images = [
+        document.getElementById("monster0"),
+        document.getElementById("monster1"),
+        document.getElementById("monster2"),
+        document.getElementById("monster3"),
+        document.getElementById("monster4"),
+        document.getElementById("monster5"),
+    ];
+    
+    this.shootSounds = [
+        document.getElementById("monster_shoot0"),
+        document.getElementById("monster_shoot1"),
+    ];
+    
+    this.eyePos = new Vector2(220, 110);
+    
+    this.sprite = new Sprite(this.right_images, [], 0.25, true);
+    
+    this.fireCooldown = .8;
+    this.timeUntilFire = 0;
+    
+    this.onCollisionX = function(hit){
+        
+        for (i in hit){
+            if ("die" in hit[i]){
+                hit[i].die();
+            }
+        }
+    }
+    
+    this.fire = function(){
+        if (this.timeUntilFire > 0){
+            return;
+        }
+        this.timeUntilFire = this.fireCooldown;
+        
+        firePos = this.pos.copy().add(this.eyePos);
+        
+        if (! SCREENRECT.collidePoint(firePos)){
+            return;
+        }
+        
+        angle = firePos.angleTo(Game.player.centre);
+        angle[0] *= -1;
+        
+        angle.rotate((Math.PI / 6) * random.binomial());
+        
+        this.shootSounds[Math.floor(Math.random() * this.shootSounds.length)].play();
+        
+        return new Bullet(firePos, angle, this, "#FF0000", 5);
+    }
+    
+    this.update = function(player){
+        if (this.dead){
+            return;
+        }
+        
+        this.fire()
+        this.sprite.update();
+        
+        this.timeUntilFire -= deltaTime;
+    }
+    
+    this.draw = function(){
+        if (this.dead){
+            return;
+        }
+        
+        this.sprite.draw(ctx, this.pos);
+    }
+}
+
 var title = document.getElementById("title");
 
 function onMouseDown(){
@@ -599,29 +792,40 @@ var playerSize = [20, 50];
 var Game = {
     player : new Player([(canvas.width - playerSize[0]) / 2, (canvas.height - playerSize[1]) / 2], playerSize),
     
+    music : document.getElementById("music"),
+    
+    totalDelta : new Vector2(0, 0),
+    
     platforms : [
                  new Platform([0, 500], [800, 600]),
                  
                  new Platform([1000, 500], [80, 60]),
+                 new Platform([1000, 660], [380, 300]),
                  new Platform([1200, 400], [200, 30]),
+                 new Platform([1200, 570], [300, 22]),
                  new Platform([1600, 650], [400, 20]),
                  new Platform([2200, 750], [50, 50]),
                  
                  new Platform([-500, 390], [400, 50]),
-                 new Platform([-700, 300], [140, 20]),
+                 new Platform([-750, 300], [140, 20]),
                  new Platform([-1600, 400], [600, 30]),
-                 new Platform([-2300, 400], [200, 30]),
-                 new Platform([-2100, 700], [700, 40]),
-                 new Platform([-2500, 550], [300, 700]),
+                 new Platform([-2150, 400], [200, 30]),
+                 new Platform([-2100, 700], [700, 400]),
+                 new CirclePlatform([-1000, 700], 80),
+                 new CirclePlatform([-600, 750], 80),
+                 new CirclePlatform([-250, 650], 80),
+                 new Platform([-2500, 550], [250, 700]),
                 ],
                  
-    enemies : [],
+    enemies : [new Monster([-2850, 275])],
                
     particles : [],
     
     misc : [],
     
-    spawnEnemyChance : 1/4, //Per second.
+    deathDepth : 2000,
+    
+    spawnEnemyChance : 1/3, //Per second.
     
     enemyTypes : [Runner, Bat],
     
@@ -630,11 +834,13 @@ var Game = {
     
     started : false,
     dt_threshold : .2,
-    
+        
     update : function(){
         if (! this.started){
             if (Key.isDown(Key.ENTER)){
                 this.started = true;
+                
+                this.music.play();
             }
             
             return;
@@ -667,6 +873,8 @@ var Game = {
         
         var delta = this.player.collider.pos.copy().sub(playerPos).mul(-1);
         
+        this.totalDelta.add(delta);
+        
         PhysicsManager.scroll(delta);
         
         for (i in this.particles){
@@ -693,12 +901,15 @@ var Game = {
         enemyClass = this.enemyTypes[Math.floor(Math.random() * this.enemyTypes.length)];
         
         do{
-            platform = this.platforms[Math.floor(Math.random() * this.platforms.length)];
+            do{
+                platform = this.platforms[Math.floor(Math.random() * this.platforms.length)];
+            }
+            while(platform instanceof CirclePlatform);
             
             x = platform.pos[0] + platform.size[0] * Math.random();
             y = platform.pos[1] - enemyClass.size[1] * clamp(5 * Math.random(), 1, 5);
         }
-        while (SCREENRECT.collidePoint([x, y]));
+        while (SCREENRECT.collidePoint([x, y]) || PhysicsManager.isColliding(new Rect([x, y], enemyClass.size)).length > 0);
         
         this.enemies.push(new enemyClass([x, y]));
     },
@@ -711,8 +922,6 @@ var Game = {
         }
         
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        this.player.draw(ctx);
         
         for (i in this.platforms){
             this.platforms[i].draw(ctx);
@@ -734,11 +943,19 @@ var Game = {
             this.misc[i].draw();
         }
         
-        //ctx.fillText(Math.floor(1 / deltaTime), 0, 32)
+        this.player.draw();
+    },
+    
+    screenToWorld : function(vector){
+        return vector.copy().sub(this.totalDelta);
     },
     
     runTitle : function(){
         ctx.drawImage(title, 0, 0);
+    },
+    
+    gameOver : function(){
+        location.reload();
     },
 }
 
@@ -748,6 +965,16 @@ function update(){
 
 function render(){
     Game.render();
+}
+
+if (typeof Game.music.loop == 'boolean'){
+    Game.music.loop = true;
+}
+else{
+    Game.music.addEventListener('ended', function() {
+        this.currentTime = 0;
+        this.play();
+    }, false);
 }
 
 var updateIntervalID = window.setInterval(update, 5);
